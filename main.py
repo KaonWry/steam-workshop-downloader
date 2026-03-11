@@ -42,7 +42,13 @@ def extract_workshop_id(value: str) -> str:
 
 workshop_id = extract_workshop_id(raw_workshop)
 
-def get_appid_from_workshop(wid: str) -> str:
+def sanitize_name(name: str) -> str:
+    """Remove or replace characters that are unsafe for directory names."""
+    name = re.sub(r'[<>:"/\\|?*]', '_', name)
+    return name.strip().rstrip('.')
+
+
+def get_appid_from_workshop(wid: str) -> tuple[str, str]:
     url = "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/"
     data = {"itemcount": "1", "publishedfileids[0]": wid}
     encoded = urllib.parse.urlencode(data).encode()
@@ -57,18 +63,37 @@ def get_appid_from_workshop(wid: str) -> str:
     try:
         obj = json.loads(body)
         details = obj["response"]["publishedfiledetails"][0]
-        appid = details.get("consumer_app_id") or details.get("consumer_appid")
+        appid = details["consumer_app_id"]
         if not appid:
             raise KeyError("consumer_app_id not found")
-        return str(appid)
+        title = details.get("title", wid)
+        return str(appid), title
     except Exception as e:
         print(f"Failed to parse Steam API response: {e}", file=sys.stderr)
         sys.exit(1)
 
 
-appid = get_appid_from_workshop(workshop_id)
+def get_game_name(appid: str) -> str:
+    url = f"https://store.steampowered.com/api/appdetails?appids={urllib.parse.quote(appid)}"
+    req = urllib.request.Request(url)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = resp.read().decode()
+    except Exception as e:
+        print(f"Failed to contact Steam Store API: {e}", file=sys.stderr)
+        return appid
 
-print(f"Downloading workshop item {workshop_id} for app {appid}")
+    try:
+        obj = json.loads(body)
+        return obj[appid]["data"]["name"]
+    except Exception:
+        return appid
+
+
+appid, workshop_title = get_appid_from_workshop(workshop_id)
+game_name = get_game_name(appid)
+
+print(f"Downloading workshop item '{workshop_title}' ({workshop_id}) for {game_name} ({appid})")
 
 with tempfile.TemporaryDirectory() as tmpdir:
     tmp_path = pathlib.Path(tmpdir)
@@ -94,7 +119,9 @@ with tempfile.TemporaryDirectory() as tmpdir:
         print(f"Downloaded item not found at {src}", file=sys.stderr)
         sys.exit(1)
 
-    dest = downloads_dir / workshop_id
+    app_dir = downloads_dir / sanitize_name(game_name)
+    app_dir.mkdir(exist_ok=True)
+    dest = app_dir / sanitize_name(workshop_title)
     if dest.exists():
         print(f"Destination {dest} already exists, removing it")
         if dest.is_dir():
