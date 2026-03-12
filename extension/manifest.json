@@ -15,6 +15,7 @@
     {
       "matches": [
         "*://steamcommunity.com/sharedfiles/filedetails/*",
+        "*://steamcommunity.com/workshop/filedetails/*",
         "*://steamcommunity.com/workshop/browse/*",
         "*://steamcommunity.com/app/*/workshop/*"
       ],
