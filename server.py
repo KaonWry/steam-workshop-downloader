@@ -10,9 +10,14 @@ from main import (
     get_game_name,
 )
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="static")
 
 DB_PATH = pathlib.Path(__file__).parent.resolve() / "queue.db"
+
+
+@app.route("/")
+def dashboard():
+    return send_file(pathlib.Path(__file__).parent / "static" / "dashboard.html")
 
 
 def get_db() -> sqlite3.Connection:

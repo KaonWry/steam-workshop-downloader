@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Workshop Download Queue</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #1b2838;
+      color: #c6d4df;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px;
+    }
+
+    h1 {
+      color: #fff;
+      font-size: 22px;
+      margin-bottom: 20px;
+    }
+
+    /* ── Add item form ─────────────────────────── */
+    .add-form {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .add-form input {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid #2a475e;
+      border-radius: 3px;
+      background: #0e1a26;
+      color: #c6d4df;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .add-form input::placeholder { color: #556b7e; }
+    .add-form input:focus { border-color: #67c1f5; }
+
+    .add-form button {
+      padding: 10px 20px;
+      background: #1a9fff;
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      font-size: 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .add-form button:hover { background: #47b5ff; }
+    .add-form button:disabled { background: #555; cursor: default; }
+
+    /* ── Table ──────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid #2a475e;
+    }
+
+    th {
+      background: #2a475e;
+      color: #fff;
+      font-size: 13px;
+    }
+
+    td { font-size: 14px; }
+
+    td a {
+      color: #67c1f5;
+      text-decoration: none;
+    }
+    td a:hover { text-decoration: underline; }
+
+    .remove-btn {
+      background: none;
+      border: none;
+      color: #c6382a;
+      cursor: pointer;
+      font-size: 17px;
+      padding: 2px 6px;
+    }
+    .remove-btn:hover { color: #ff4444; }
+
+    /* ── Buttons row ───────────────────────────── */
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    #download-all {
+      flex: 1;
+      padding: 10px;
+      background: #5c7e10;
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    #download-all:hover { background: #6d961a; }
+    #download-all:disabled { background: #555; cursor: default; }
+
+    #clear-all {
+      padding: 10px 20px;
+      background: #8b2c23;
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    #clear-all:hover { background: #a63529; }
+    #clear-all:disabled { background: #555; cursor: default; }
+
+    /* ── Status / empty ────────────────────────── */
+    .empty {
+      text-align: center;
+      padding: 40px 0;
+      color: #8f98a0;
+      font-size: 15px;
+    }
+
+    #status {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #8f98a0;
+      text-align: center;
+    }
+
+    #add-status {
+      font-size: 13px;
+      color: #8f98a0;
+      margin-bottom: 16px;
+      min-height: 20px;
+    }
+
+    #add-status.error { color: #c6382a; }
+    #add-status.success { color: #5c7e10; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Workshop Download Queue</h1>
+
+    <div class="add-form">
+      <input type="text" id="workshop-input"
+             placeholder="Workshop URL or ID (e.g. 2890901044 or https://steamcommunity.com/sharedfiles/filedetails/?id=2890901044)">
+      <button id="add-btn">Add to Queue</button>
+    </div>
+    <div id="add-status"></div>
+
+    <div id="content"></div>
+    <div id="status"></div>
+  </div>
+
+<script>
+const API = '';
+const contentDiv = document.getElementById('content');
+const statusDiv = document.getElementById('status');
+const addStatus = document.getElementById('add-status');
+const workshopInput = document.getElementById('workshop-input');
+const addBtn = document.getElementById('add-btn');
+
+// ── Add to queue ──────────────────────────────────────────────
+
+addBtn.addEventListener('click', addItem);
+workshopInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') addItem();
+});
+
+async function addItem() {
+  const raw = workshopInput.value.trim();
+  if (!raw) return;
+
+  addBtn.disabled = true;
+  addStatus.textContent = 'Resolving workshop item...';
+  addStatus.className = '';
+
+  try {
+    const resp = await fetch(`${API}/queue`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workshop_id: raw }),
+    });
+
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      addStatus.textContent = data.error || 'Failed to add';
+      addStatus.className = 'error';
+    } else {
+      addStatus.textContent = `Added: ${data.game_name} — ${data.workshop_title}`;
+      addStatus.className = 'success';
+      workshopInput.value = '';
+      loadQueue();
+    }
+  } catch {
+    addStatus.textContent = 'Server offline';
+    addStatus.className = 'error';
+  }
+
+  addBtn.disabled = false;
+}
+
+// ── Load & render queue ───────────────────────────────────────
+
+async function loadQueue() {
+  statusDiv.textContent = '';
+  try {
+    const resp = await fetch(`${API}/queue`);
+    const items = await resp.json();
+    render(items);
+  } catch {
+    contentDiv.innerHTML = '<p class="empty">Server offline</p>';
+  }
+}
+
+function render(items) {
+  if (!items.length) {
+    contentDiv.innerHTML = '<p class="empty">Queue is empty. Add a workshop item above.</p>';
+    return;
+  }
+
+  let html = `<table>
+    <tr><th>Game</th><th>Workshop Item</th><th>Link</th><th></th></tr>`;
+
+  for (const item of items) {
+    html += `<tr>
+      <td>${esc(item.game_name)}</td>
+      <td>${esc(item.workshop_title)}</td>
+      <td><a href="${esc(item.workshop_link)}" target="_blank">Open</a></td>
+      <td><button class="remove-btn" data-id="${item.id}" title="Remove">&#10005;</button></td>
+    </tr>`;
+  }
+
+  html += '</table>';
+  html += `<div class="actions">
+    <button id="download-all">Download All (${items.length} items)</button>
+    <button id="clear-all">Clear Queue</button>
+  </div>`;
+  contentDiv.innerHTML = html;
+
+  for (const btn of contentDiv.querySelectorAll('.remove-btn')) {
+    btn.addEventListener('click', async () => {
+      await fetch(`${API}/queue/${btn.dataset.id}`, { method: 'DELETE' });
+      loadQueue();
+    });
+  }
+
+  document.getElementById('download-all').addEventListener('click', downloadAll);
+  document.getElementById('clear-all').addEventListener('click', clearAll);
+}
+
+// ── Download all ──────────────────────────────────────────────
+
+async function downloadAll() {
+  const btn = document.getElementById('download-all');
+  btn.disabled = true;
+  btn.textContent = 'Downloading...';
+  statusDiv.textContent = 'Starting downloads...';
+
+  let done = 0;
+  let errors = 0;
+
+  while (true) {
+    let resp;
+    try {
+      resp = await fetch(`${API}/download-next`, { method: 'POST' });
+    } catch {
+      statusDiv.textContent = 'Server offline';
+      break;
+    }
+
+    if (resp.status === 400) break;
+
+    if (!resp.ok) {
+      errors++;
+      const data = await resp.json();
+      statusDiv.textContent = `Error: ${data.error}`;
+      continue;
+    }
+
+    const result = await resp.json();
+    done++;
+    statusDiv.textContent = `Downloaded ${done}... now fetching zip`;
+
+    // Trigger browser download via hidden anchor
+    const a = document.createElement('a');
+    a.href = `${API}/download-file/${result.workshop_id}`;
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    // Small delay so browser can start each download
+    await new Promise(r => setTimeout(r, 500));
+    statusDiv.textContent = `Downloaded ${done}...`;
+  }
+
+  statusDiv.textContent = `Done! ${done} downloaded` + (errors ? `, ${errors} failed` : '');
+  loadQueue();
+}
+
+// ── Clear queue ───────────────────────────────────────────────
+
+async function clearAll() {
+  if (!confirm('Remove all items from the queue?')) return;
+
+  try {
+    const resp = await fetch(`${API}/queue`);
+    const items = await resp.json();
+    for (const item of items) {
+      await fetch(`${API}/queue/${item.id}`, { method: 'DELETE' });
+    }
+    loadQueue();
+  } catch {
+    statusDiv.textContent = 'Failed to clear queue';
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+
+function esc(str) {
+  const d = document.createElement('div');
+  d.appendChild(document.createTextNode(str));
+  return d.innerHTML;
+}
+
+loadQueue();
+</script>
+</body>
+</html>
