@@ -11,7 +11,29 @@ import re
 
 project_root = pathlib.Path(__file__).parent.resolve()
 downloads_dir = project_root / "Downloads"
-downloads_dir.mkdir(exist_ok=True)
+downloads_dir.mkdir(parents=True, exist_ok=True)
+
+
+def load_settings() -> dict:
+    settings_path = project_root / "settings.json"
+    default_settings = {
+        "download_via_browser": True,
+        "mod_directories": {}
+    }
+    if settings_path.exists():
+        try:
+            with open(settings_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                default_settings.update(data)
+        except Exception as e:
+            print(f"Warning: failed to load settings.json: {e}")
+    return default_settings
+
+
+def save_settings(settings: dict):
+    settings_path = project_root / "settings.json"
+    with open(settings_path, "w", encoding="utf-8") as f:
+        json.dump(settings, f, indent=2)
 
 
 def extract_workshop_id(value: str) -> str:
@@ -77,6 +99,10 @@ def download_workshop_item(raw_workshop: str) -> dict:
     appid, workshop_title = get_appid_from_workshop(workshop_id)
     game_name = get_game_name(appid)
 
+    settings = load_settings()
+    download_via_browser = settings.get("download_via_browser", True)
+    mod_dirs = settings.get("mod_directories", {})
+
     print(f"Downloading workshop item '{workshop_title}' ({workshop_id}) for {game_name} ({appid})")
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -98,8 +124,12 @@ def download_workshop_item(raw_workshop: str) -> dict:
         if not src.exists():
             raise FileNotFoundError(f"Downloaded item not found at {src}")
 
-        app_dir = downloads_dir / sanitize_name(game_name)
-        app_dir.mkdir(exist_ok=True)
+        if not download_via_browser and appid in mod_dirs and str(mod_dirs[appid]).strip():
+            app_dir = pathlib.Path(mod_dirs[appid])
+        else:
+            app_dir = downloads_dir / sanitize_name(game_name)
+
+        app_dir.mkdir(parents=True, exist_ok=True)
         dest = app_dir / sanitize_name(workshop_title)
         if dest.exists():
             print(f"Destination {dest} already exists, removing it")
@@ -117,6 +147,7 @@ def download_workshop_item(raw_workshop: str) -> dict:
         "appid": appid,
         "game_name": game_name,
         "destination": str(dest),
+        "download_via_browser": download_via_browser,
     }
 
 

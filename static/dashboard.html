@@ -162,7 +162,10 @@
 </head>
 <body>
   <div class="container">
-    <h1>Workshop Download Queue</h1>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h1 style="margin-bottom: 0;">Workshop Download Queue</h1>
+      <a href="/settings" style="color: #67c1f5; text-decoration: none; font-size: 16px;" title="Open Settings">⚙ Settings</a>
+    </div>
 
     <div class="add-form">
       <input type="text" id="workshop-input"
@@ -304,22 +307,27 @@ async function downloadAll() {
 
     const result = await resp.json();
     done++;
-    statusDiv.textContent = `Downloaded ${done}... now fetching zip`;
 
-    // Trigger browser download via hidden anchor
-    const a = document.createElement('a');
-    a.href = `${API}/download-file/${result.workshop_id}`;
-    a.download = '';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    if (result.download_via_browser) {
+      statusDiv.textContent = `Downloaded ${done}... now fetching zip`;
+
+      // Trigger browser download via hidden anchor
+      const a = document.createElement('a');
+      a.href = `${API}/download-file/${result.workshop_id}`;
+      a.download = '';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } else {
+      statusDiv.textContent = `Moved ${done} to custom directory...`;
+    }
 
     // Small delay so browser can start each download
     await new Promise(r => setTimeout(r, 500));
-    statusDiv.textContent = `Downloaded ${done}...`;
+    statusDiv.textContent = `Finished ${done}...`;
   }
 
-  statusDiv.textContent = `Done! ${done} downloaded` + (errors ? `, ${errors} failed` : '');
+  statusDiv.textContent = `Done! ${done} Processed` + (errors ? `, ${errors} failed` : '');
   loadQueue();
 }
 

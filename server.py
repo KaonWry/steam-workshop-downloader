@@ -8,6 +8,8 @@ from main import (
     extract_workshop_id,
     get_appid_from_workshop,
     get_game_name,
+    load_settings,
+    save_settings,
 )
 
 app = Flask(__name__, static_folder="static")
@@ -18,6 +20,22 @@ DB_PATH = pathlib.Path(__file__).parent.resolve() / "queue.db"
 @app.route("/")
 def dashboard():
     return send_file(pathlib.Path(__file__).parent / "static" / "dashboard.html")
+
+
+@app.route("/settings")
+def settings_page():
+    return send_file(pathlib.Path(__file__).parent / "static" / "settings.html")
+
+
+@app.route("/api/settings", methods=["GET", "POST", "OPTIONS"])
+def api_settings():
+    if request.method == "OPTIONS":
+        return "", 204
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        save_settings(data)
+        return jsonify({"status": "ok"})
+    return jsonify(load_settings())
 
 
 def get_db() -> sqlite3.Connection:
@@ -139,6 +157,11 @@ def download():
     tmp_zip = tempfile.mktemp(suffix=".zip")
     shutil.make_archive(tmp_zip.removesuffix(".zip"), "zip", dest)
 
+    settings = load_settings()
+    if settings.get("download_via_browser", True):
+        # We've zipped it, so we can clean up the original unzipped folder
+        shutil.rmtree(dest, ignore_errors=True)
+
     return send_file(
         tmp_zip,
         mimetype="application/zip",
@@ -185,7 +208,7 @@ def download_file(wid):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-    from main import sanitize_name, downloads_dir
+    from main import sanitize_name, downloads_dir, load_settings
     dest = downloads_dir / sanitize_name(game_name) / sanitize_name(workshop_title)
     if not dest.exists():
         return jsonify({"error": "Item not found on disk"}), 404
@@ -193,6 +216,11 @@ def download_file(wid):
     zip_name = f"{game_name} - {workshop_title}"
     tmp_zip = tempfile.mktemp(suffix=".zip")
     shutil.make_archive(tmp_zip.removesuffix(".zip"), "zip", dest)
+
+    settings = load_settings()
+    if settings.get("download_via_browser", True):
+        # We've zipped it, so we can clean up the original unzipped folder
+        shutil.rmtree(dest, ignore_errors=True)
 
     return send_file(
         tmp_zip,

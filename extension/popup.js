@@ -80,9 +80,11 @@ async function downloadAll() {
 
     // Got result JSON — trigger browser download from server URL
     const result = await resp.json();
-    chrome.downloads.download({
-      url: `${API}/download-file/${result.workshop_id}`,
-    });
+    if (result.download_via_browser) {
+      chrome.downloads.download({
+        url: `${API}/download-file/${result.workshop_id}`,
+      });
+    }
     done++;
     statusDiv.textContent = `Downloaded ${done}...`;
   }

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings - Workshop Download Queue</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #1b2838;
+      color: #c6d4df;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px;
+    }
+
+    h1 {
+      color: #fff;
+      font-size: 22px;
+      margin-bottom: 20px;
+    }
+    h2 {
+      color: #fff;
+      font-size: 18px;
+      margin-bottom: 15px;
+      margin-top: 30px;
+    }
+
+    .form-group {
+      background: #2a475e;
+      padding: 20px;
+      border-radius: 3px;
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: flex;
+      align-items: center;
+      font-size: 16px;
+      color: #fff;
+      cursor: pointer;
+    }
+    
+    .form-group label input {
+      margin-right: 10px;
+      width: 18px;
+      height: 18px;
+    }
+
+    .help {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #8f98a0;
+      margin-left: 28px;
+    }
+
+    /* Mod Dirs */
+    .mod-dir-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+    
+    .mod-dir-row input {
+      padding: 10px 14px;
+      border: 1px solid #2a475e;
+      border-radius: 3px;
+      background: #0e1a26;
+      color: #c6d4df;
+      font-size: 14px;
+      outline: none;
+    }
+    
+    .mod-dir-row input:focus { border-color: #67c1f5; }
+    
+    .input-appid { flex: 0 0 150px; }
+    .input-path { flex: 1; }
+
+    .btn {
+      padding: 10px 20px;
+      background: #1a9fff;
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      font-size: 14px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      text-align: center;
+    }
+
+    .btn:hover { background: #47b5ff; }
+
+    .btn.remove {
+      background: none;
+      color: #c6382a;
+      font-size: 20px;
+      padding: 0 10px;
+    }
+    .btn.remove:hover { color: #ff4444; background: none; }
+
+    .btn.secondary {
+      background: #2a475e; 
+    }
+    .btn.secondary:hover {
+      background: #3b6283;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 30px;
+    }
+
+    #save-btn {
+      background: #5c7e10;
+    }
+    #save-btn:hover {
+      background: #6d961a;
+    }
+
+    #status {
+      margin-top: 15px;
+      font-size: 14px;
+    }
+    .success { color: #5c7e10; }
+    .error { color: #c6382a; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div style="display: flex; align-items: center; margin-bottom: 20px;">
+        <a href="/" style="color: #c6d4df; text-decoration: none; font-size: 24px; margin-right: 15px; padding: 5px 10px; background: #2a475e; border-radius: 3px;" title="Back to Dashboard">←</a>
+        <h1 style="margin-bottom: 0;">Settings</h1>
+    </div>
+
+    <div class="form-group">
+      <label>
+        <input type="checkbox" id="browser-dl"> Download via Browser (ZIP)
+      </label>
+      <p class="help">If checked, items are downloaded as ZIP files via your browser. If unchecked, files are automatically moved directly to the directories defined below after downloading via SteamCMD.</p>
+    </div>
+    
+    <h2>Mod Directories</h2>
+    <p style="margin-bottom: 15px; font-size: 14px; color: #8f98a0;">Map a Steam App ID (e.g., 294100) to an absolute directory path on this computer.</p>
+    
+    <div id="mod-dirs"></div>
+    <button id="add-dir" class="btn secondary" style="margin-top: 10px;">+ Add Game Directory</button>
+    
+    <div class="actions">
+      <button id="save-btn" class="btn">Save Settings</button>
+      <a href="/" class="btn secondary">Back to Dashboard</a>
+    </div>
+    
+    <div id="status"></div>
+  </div>
+
+<script>
+const browserDlCheckbox = document.getElementById('browser-dl');
+const modDirsContainer = document.getElementById('mod-dirs');
+const addDirBtn = document.getElementById('add-dir');
+const saveBtn = document.getElementById('save-btn');
+const statusDiv = document.getElementById('status');
+
+function createRow(appid = '', path = '') {
+  const row = document.createElement('div');
+  row.className = 'mod-dir-row';
+  
+  const idInput = document.createElement('input');
+  idInput.className = 'input-appid';
+  idInput.placeholder = 'App ID (e.g. 294100)';
+  idInput.value = appid;
+
+  const pathInput = document.createElement('input');
+  pathInput.className = 'input-path';
+  pathInput.placeholder = 'Path (e.g. /home/user/games/mods)';
+  pathInput.value = path;
+
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'btn remove';
+  removeBtn.innerHTML = '&#10005;';
+  removeBtn.title = 'Remove';
+  removeBtn.onclick = () => row.remove();
+
+  row.appendChild(idInput);
+  row.appendChild(pathInput);
+  row.appendChild(removeBtn);
+  
+  modDirsContainer.appendChild(row);
+}
+
+async function loadSettings() {
+  try {
+    const res = await fetch('/api/settings');
+    const data = await res.json();
+    
+    browserDlCheckbox.checked = data.download_via_browser ?? true;
+    
+    modDirsContainer.innerHTML = '';
+    const dirs = data.mod_directories || {};
+    for (const [appid, path] of Object.entries(dirs)) {
+      createRow(appid, path);
+    }
+  } catch (err) {
+    statusDiv.textContent = 'Error loading settings: ' + err.message;
+    statusDiv.className = 'error';
+  }
+}
+
+async function saveSettings() {
+  saveBtn.disabled = true;
+  statusDiv.textContent = 'Saving...';
+  statusDiv.className = '';
+  
+  const payload = {
+    download_via_browser: browserDlCheckbox.checked,
+    mod_directories: {}
+  };
+  
+  const rows = modDirsContainer.querySelectorAll('.mod-dir-row');
+  rows.forEach(row => {
+    const appid = row.querySelector('.input-appid').value.trim();
+    const path = row.querySelector('.input-path').value.trim();
+    if (appid) {
+      payload.mod_directories[appid] = path;
+    }
+  });
+
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    
+    if (res.ok) {
+      statusDiv.textContent = 'Settings saved successfully!';
+      statusDiv.className = 'success';
+      setTimeout(() => { if(statusDiv.textContent.includes('saved')) statusDiv.textContent = ''; }, 3000);
+    } else {
+      throw new Error('Server returned ' + res.status);
+    }
+  } catch (err) {
+    statusDiv.textContent = 'Error saving settings: ' + err.message;
+    statusDiv.className = 'error';
+  }
+  
+  saveBtn.disabled = false;
+}
+
+addDirBtn.onclick = () => createRow();
+saveBtn.onclick = saveSettings;
+
+// Init
+loadSettings();
+</script>
+</body>
+</html>
