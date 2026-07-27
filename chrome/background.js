@@ -1,3 +1,7 @@
+chrome.action.onClicked.addListener(() => {
+  chrome.tabs.create({ url: 'http://localhost:5000' });
+});
+
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: 'add-to-workshop-queue',

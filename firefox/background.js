@@ -17,6 +17,10 @@ async function addToQueue(workshopId) {
   }
 }
 
+browser.action.onClicked.addListener(() => {
+  browser.tabs.create({ url: 'http://localhost:5000' });
+});
+
 browser.runtime.onInstalled.addListener(() => {
   browser.contextMenus.create({
     id: 'add-to-workshop-queue',
